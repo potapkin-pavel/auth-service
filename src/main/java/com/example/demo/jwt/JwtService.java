@@ -40,7 +40,7 @@ public class JwtService {
             .build()
             .parseSignedClaims(token)
             .getPayload()
-            .getSubject();
+            .getSubject(); // TODO: return claims and user id
     }
 
     public Map<String, ?> getClaims(String token) {

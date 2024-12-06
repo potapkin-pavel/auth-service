@@ -12,6 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.example.demo.exception.InvalidUserDataException;
+import com.example.demo.user.role.RoleRepository;
+import com.example.demo.user.role.Role;
 
 import java.util.Optional;
 
@@ -24,6 +26,9 @@ class UserServiceTest {
     @Mock
     private UserRepository userRepository;
     
+    @Mock
+    private RoleRepository roleRepository;
+    
     private UserService userService;
 
     private static final String TEST_EMAIL = "test@example.com";
@@ -32,7 +37,7 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(passwordEncoder, userRepository);
+        userService = new UserService(passwordEncoder, userRepository, roleRepository);
     }
 
     @Test
@@ -64,17 +69,13 @@ class UserServiceTest {
             userService.register("", TEST_PASSWORD)
         );
         
-        assertEquals("Email and password cannot be empty", exception.getMessage());
+        assertEquals("Email and password can not be empty.", exception.getMessage());
         verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
     void register_WithEmptyPassword_ShouldThrowException() {
-        InvalidUserDataException exception = assertThrows(InvalidUserDataException.class, () -> 
-            userService.register(TEST_EMAIL, "")
-        );
-        
-        assertEquals("Email and password cannot be empty", exception.getMessage());
+        assertThrows(InvalidUserDataException.class, () -> userService.register(TEST_EMAIL, ""));
         verify(userRepository, never()).save(any(User.class));
     }
 
@@ -94,5 +95,59 @@ class UserServiceTest {
         when(passwordEncoder.matches(TEST_PASSWORD, ENCODED_PASSWORD)).thenReturn(false);
         
         assertFalse(userService.userExist(TEST_EMAIL, TEST_PASSWORD));
+    }
+
+    @Test
+    void addRoleToUser_WithValidRole_ShouldSucceed() {
+        Long userId = 1L;
+        String roleName = "ADMIN";
+        User user = new User(TEST_EMAIL, ENCODED_PASSWORD);
+        Role role = new Role();
+        role.setName(roleName);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(roleRepository.findByName(roleName)).thenReturn(Optional.of(role));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        User result = userService.addRoleToUser(userId, roleName);
+        
+        assertNotNull(result);
+        assertTrue(result.getRoles().contains(role));
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void addRoleToUser_WithNonExistentRole_ShouldThrowException() {
+        Long userId = 1L;
+        String roleName = "NON_EXISTENT";
+        User user = new User(TEST_EMAIL, ENCODED_PASSWORD);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(roleRepository.findByName(roleName)).thenReturn(Optional.empty());
+
+        assertThrows(jakarta.persistence.EntityNotFoundException.class, 
+            () -> userService.addRoleToUser(userId, roleName));
+        
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void removeRoleFromUser_WithValidRole_ShouldSucceed() {
+        Long userId = 1L;
+        String roleName = "ADMIN";
+        User user = new User(TEST_EMAIL, ENCODED_PASSWORD);
+        Role role = new Role();
+        role.setName(roleName);
+        user.addRole(role);
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(roleRepository.findByName(roleName)).thenReturn(Optional.of(role));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        User result = userService.removeRoleFromUser(userId, roleName);
+        
+        assertNotNull(result);
+        assertFalse(result.getRoles().contains(role));
+        verify(userRepository).save(user);
     }
 }

@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.demo.jwt.JwtService;
 import com.example.demo.user.UserService;
+import com.example.demo.user.role.Role;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/v1/auth/")
@@ -30,7 +33,8 @@ public class AuthController {
     public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest loginRequest) {
         if (userService.userExist(loginRequest.email(), loginRequest.password())) {
             Map<String, Object> claims = new HashMap<>();
-            claims.put("role", "USER");
+            List<Role> roles = userService.getUserRoles(loginRequest.email());
+            claims.put("roles", roles);
             String token = jwtService.generateToken(loginRequest.email(), claims);
             Map<String, String> response = new HashMap<>();
             response.put("token", token);
